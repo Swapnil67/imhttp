@@ -6,6 +6,7 @@
 #include<errno.h>
 #include<ctype.h>
 #include<stdbool.h>
+#include <inttypes.h>
 
 #include<netdb.h>
 #include<sys/types.h>
@@ -25,8 +26,7 @@ ssize_t imhttp_write(ImHTTP_Socket socket, const void *buf, size_t count) {
     return write((int) (int64_t)socket, buf, count);
 }
 
-ssize_t imhttp_read(ImHTTP_Socket socket, char *buf, size_t count) {
-    // printf("%ld\n", count);
+ssize_t imhttp_read(ImHTTP_Socket socket, void *buf, size_t count) {
     return  read((int) (int64_t)socket, buf, count);
 }
 
@@ -84,7 +84,7 @@ int main() {
     imhttp_res_begin(&imhttp);
     {
 	uint64_t status_code = imhttp_res_status_code(&imhttp);
-	printf("Status Code: %lu\n", status_code);
+	printf("Status Code: %"PRIu64"\n", status_code);
 
 	// * Read headers
 	String_View name, value;
