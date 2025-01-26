@@ -1,0 +1,4 @@
+CFLAGS=-Wall -Wextra -std=c17 -pedantic
+
+main: main.c imhttp.h
+	$(CC) $(CFLAGS) -o main main.c
