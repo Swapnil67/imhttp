@@ -101,12 +101,6 @@ int main() {
 	    printf(SV_Fmt, SV_Arg(chunk));
 	}
 
-	// printf("Content Length: %lu\n", imhttp.content_length);
-	// fputs("Meta:\n", stdout);
-	// fwrite(imhttp.res_meta, 1, imhttp.res_meta_size, stdout);
-	// fputc('\n', stdout);
-	// fputs("Body Chunk:\n", stdout);
-	// fwrite(imhttp.res_body_chunk, 1, imhttp.res_body_chunk_size, stdout);
     }
     imhttp_res_end(&imhttp);
 
