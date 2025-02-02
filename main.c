@@ -29,6 +29,9 @@ ssize_t imhttp_write(ImHTTP_Socket socket, const void *buf, size_t count) {
 
 ssize_t imhttp_read(ImHTTP_Socket socket, void *buf, size_t count) {
     // * Read Linux System Call
+    // printf("Descriptor: %p\n", socket);
+    // printf("Buffer: %p\n", buf);
+    // printf("Count: %ld\n", count);
     return read((int) (int64_t)socket, buf, count);
 }
 

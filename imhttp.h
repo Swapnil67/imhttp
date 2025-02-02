@@ -108,20 +108,37 @@ void imhttp_req_end(ImHTTP *imhttp) {
 
 // * Response Handling Code
 
-static void imhttp_shift_rollin_buffer(ImHTTP *imhttp, const char *end) {
+// * Moves the ownership from rollin_buffer to user_buffer
+static String_View imhttp_shift_rollin_buffer(ImHTTP *imhttp, const char *end) {
+
+    // * Boundary checks
     assert(end >= imhttp->rollin_buffer);
     size_t n = end - imhttp->rollin_buffer;
     assert(n <= imhttp->rollin_buffer_size);
+
+    // * Copy chunk to user buffer
+    assert(n <= IMHTTP_USER_BUFFER_CAPACITY);
+    memcpy(imhttp->user_buffer, imhttp->rollin_buffer, n);
+
+    // * Shifting the rollin buffer
+    imhttp->rollin_buffer_size -= n;
     memmove(imhttp->rollin_buffer, end, imhttp->rollin_buffer_size);
+
+    return (String_View) {
+	.data = imhttp->user_buffer,
+	.count = n
+    };
 }
 
 static void imhttp_top_rollin_buffer(ImHTTP *imhttp) {
-    if(imhttp->rollin_buffer_size < IMHTTP_ROLLIN_BUFFER_CAPACITY) {
+    if(imhttp->rollin_buffer_size == 0) {
+    // if(imhttp->rollin_buffer_size < IMHTTP_ROLLIN_BUFFER_CAPACITY) {
 	size_t n = imhttp->read(
 	               imhttp->socket,
 		       imhttp->rollin_buffer + imhttp->rollin_buffer_size,		     
 		       IMHTTP_ROLLIN_BUFFER_CAPACITY - imhttp->rollin_buffer_size);
-		       
+
+        // printf("n = %ld\n", n);
 	assert(n > 0);	       
 	imhttp->rollin_buffer_size += n;
     }
@@ -151,39 +168,34 @@ uint64_t imhttp_res_status_code(ImHTTP *imhttp) {
 	 "The rolling buffer is so small that it could not fit the whole status line."    
 	 "Or maybe the status line was not fully read after the imhttp_top_rollin_buffer()"
 	 "above");
-    
+
+    status_line = imhttp_shift_rollin_buffer(imhttp, rollin.data);
     // * TODO: HTTP version is skipped in imhttp_res_status_code
     sv_chop_by_delim(&status_line, ' ');
     String_View code_sv = sv_chop_by_delim(&status_line, ' ');
     // SV_PRINT(code_sv);
-    imhttp_shift_rollin_buffer(imhttp, rollin.data);
+
     return sv_to_u64(code_sv);
 }
 
 bool imhttp_res_next_header(ImHTTP *imhttp, String_View *name, String_View *value) {
     imhttp_top_rollin_buffer(imhttp);    
     String_View rollin = imhttp_rollin_buffer_as_sv(imhttp);
+    // SV_PRINT(rollin);
+    
     String_View header_line = sv_chop_by_delim(&rollin, '\n');
-
+    
     assert(
 	 sv_ends_with(header_line, cstr_to_sv("\r")) &&
 	 "The rolling buffer is so small that it could not fit the whole status line."    
 	 "Or maybe the header line was not fully read after the imhttp_top_rollin_buffer()"
 	 "above");
 
-
-    // * Transfer the ownership of header_line from rollin_buffer to user_buffer
-    {	     
-        // * Copy the rollin_buffer to user_buffer
-	memcpy(imhttp->user_buffer, header_line.data, header_line.count);
-	header_line.data = imhttp->user_buffer;
-    }
-
-    imhttp_shift_rollin_buffer(imhttp, rollin.data);
-    
+    header_line = imhttp_shift_rollin_buffer(imhttp, rollin.data);
 
     // * Check if we got \r\n
-    if(!sv_eq(header_line, cstr_to_sv("\r"))) {
+    // * After \r\n we have html 
+    if(!sv_eq(header_line, cstr_to_sv("\r\n"))) {
 	*name = sv_chop_by_delim(&header_line, ':');
 	sv_trim(&header_line);
 	*value = header_line;
@@ -209,19 +221,20 @@ bool imhttp_res_next_body_chunk(ImHTTP *imhttp, String_View *chunk) {
     if(imhttp->content_length > 0) {
 	imhttp_top_rollin_buffer(imhttp);
 	String_View rollin = imhttp_rollin_buffer_as_sv(imhttp);
-
+	// SV_PRINT(rollin);
+	
 	// * TODO: ImHTTP does not handle the situation when the server responded with more data than it claimed with Content-Length Header	
-	assert(rollin.count <= (size_t) imhttp->content_length);
+	// assert(rollin.count <= (size_t) imhttp->content_length);
 
-	assert(rollin.count <= IMHTTP_USER_BUFFER_CAPACITY);
-	memcpy(imhttp->user_buffer, rollin.data, rollin.count);
+	String_View result = imhttp_shift_rollin_buffer(
+				 imhttp,
+				 imhttp->rollin_buffer + imhttp->rollin_buffer_size);
 
 	if(chunk) {
-	    chunk->data = imhttp->user_buffer;
-	    chunk->count = rollin.count;
+	    *chunk = result;
 	}
 
-	imhttp_shift_rollin_buffer(imhttp, rollin.data);
+	imhttp->content_length -= result.count;
 	return true;
     }
    
