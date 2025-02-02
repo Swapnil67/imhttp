@@ -1,5 +1,6 @@
 main
 
+.vscode
 
 # -*- mode: gitignore; -*-
 *~

@@ -23,11 +23,13 @@
 #define PORT "80"
 
 ssize_t imhttp_write(ImHTTP_Socket socket, const void *buf, size_t count) {
+    // * Write Linux System Call
     return write((int) (int64_t)socket, buf, count);
 }
 
 ssize_t imhttp_read(ImHTTP_Socket socket, void *buf, size_t count) {
-    return  read((int) (int64_t)socket, buf, count);
+    // * Read Linux System Call
+    return read((int) (int64_t)socket, buf, count);
 }
 
 
@@ -39,7 +41,7 @@ int main() {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
 
-    struct addrinfo *addrs; // Linked List
+    struct addrinfo *addrs; // * Linked List
     if(getaddrinfo(HOST, PORT, &hints, &addrs) < 0) {
 	fprintf(stderr, "Could not get address of `"HOST"`:%s\n", strerror(errno));
 	exit(1);
@@ -58,14 +60,15 @@ int main() {
     }
     freeaddrinfo(addrs);
 
-    if(sd == -1) {
-	fprintf(stderr, "Could not connect to "HOST":"PORT": %s\n", strerror(errno));
-	exit(1);
+    if (sd == -1) {
+	fprintf(stderr, "Could not connect to " HOST ":" PORT ": %s\n", strerror(errno));	
+	exit(1);	
     }
-    
+
+    // * imhttp socket object
     static ImHTTP imhttp = {
-	.write  = imhttp_write,
-	.read   = imhttp_read,
+		    .write = imhttp_write,
+		    .read = imhttp_read,
     };
     imhttp.socket = (void*) (int64_t) sd;
 
