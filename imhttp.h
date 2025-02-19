@@ -39,6 +39,7 @@ typedef struct {
     size_t user_buffer_size;
     
     int content_length;
+    bool chunked;
 } ImHTTP;
 
 void imhttp_req_begin(ImHTTP *imhttp, ImHTTP_Method method, const char *resource);
@@ -70,12 +71,16 @@ default:
     }
 }
 
+// For req & res format
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Messages
 
 static void imhttp_write_cstr(ImHTTP *imhttp, const char* cstr) {
     size_t cstr_size = strlen(cstr);
     imhttp->write(imhttp->socket, cstr, cstr_size);
 }
 
+// This function will write following line to socket
+// * GET / HTTP/1.1\r\n
 void imhttp_req_begin(ImHTTP *imhttp, ImHTTP_Method method, const char *resource) {
     imhttp_write_cstr(imhttp, imhttp_method_as_cstr(method));
     imhttp_write_cstr(imhttp, " ");
@@ -83,6 +88,8 @@ void imhttp_req_begin(ImHTTP *imhttp, ImHTTP_Method method, const char *resource
     imhttp_write_cstr(imhttp, " HTTP/1.0\r\n");
 }
 
+// * This function will write some headers to socket in following format
+// * Host: google.com
 void imhttp_req_header(ImHTTP *imhttp, const char *header_name, const char *header_value) {
     imhttp_write_cstr(imhttp, header_name);
     imhttp_write_cstr(imhttp, ": ");
@@ -90,6 +97,7 @@ void imhttp_req_header(ImHTTP *imhttp, const char *header_name, const char *head
     imhttp_write_cstr(imhttp, "\r\n");
 }
 
+// * Finish the request format with \r\n
 void imhttp_req_headers_end(ImHTTP *imhttp) {
     imhttp_write_cstr(imhttp, "\r\n");
 }
@@ -154,9 +162,10 @@ static String_View imhttp_rollin_buffer_as_sv(ImHTTP *imhttp) {
 void imhttp_res_begin(ImHTTP *imhttp) {
     // * Reset the content_length
     imhttp->content_length = -1;
-    
+    imhttp->chunked = false;
 }
 
+// * Get the status code from response
 uint64_t imhttp_res_status_code(ImHTTP *imhttp) {
     imhttp_top_rollin_buffer(imhttp);
     String_View rollin = imhttp_rollin_buffer_as_sv(imhttp);
@@ -203,6 +212,16 @@ bool imhttp_res_next_header(ImHTTP *imhttp, String_View *name, String_View *valu
 	if(sv_eq(*name, cstr_to_sv("Content-Length"))) {
 	    // TODO content_length overflow
 	    imhttp->content_length = sv_to_u64(*value);
+	} else if(sv_eq(*name, cstr_to_sv("Transfer-Encoding"))) {
+	    // There can be multiple ',' separated transfer encodings
+	    String_View encoding_list = *value;
+	    while(encoding_list.count > 0) {
+		String_View encoding = sv_chop_by_delim(&encoding_list, ',');
+		sv_trim(&encoding);
+		if(sv_eq(encoding, cstr_to_sv("chunked"))) {
+		    imhttp->chunked = true;
+		}
+	    }
 	}
 		
 	return true;

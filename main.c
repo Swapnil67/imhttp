@@ -37,7 +37,6 @@ ssize_t imhttp_read(ImHTTP_Socket socket, void *buf, size_t count) {
 
 
 int main() {
-
     // * Resolve the host (DNS Resolution)
     struct addrinfo hints = {0};
     hints.ai_family = AF_INET;
@@ -77,6 +76,7 @@ int main() {
 
     imhttp_req_begin(&imhttp, IMHTTP_GET, "/");
     // printf("Socket: %d\n", sd);
+    // * Add some headers to request headers
     {
 	imhttp_req_header(&imhttp, "Host", HOST);
 	imhttp_req_header(&imhttp, "Foo", "Bar");

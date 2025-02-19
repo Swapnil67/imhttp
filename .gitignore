@@ -1,6 +1,10 @@
 main
 
 .vscode
+*.dSYM
+imhttp_old.h
+
+.DS_Store
 
 # -*- mode: gitignore; -*-
 *~
