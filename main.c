@@ -19,7 +19,10 @@
 #define IMHTTP_IMPLEMENTATION
 #include "./imhttp.h"
 
-#define HOST "google.com"
+// #define HOST "google.com"
+// #define PORT "80"
+
+#define HOST "anglesharp.azurewebsites.net"
 #define PORT "80"
 
 ssize_t imhttp_write(ImHTTP_Socket socket, const void *buf, size_t count) {
@@ -69,18 +72,17 @@ int main() {
 
     // * imhttp socket object
     static ImHTTP imhttp = {
-		    .write = imhttp_write,
-		    .read = imhttp_read,
+	.write = imhttp_write,
+	.read = imhttp_read,	
     };
     imhttp.socket = (void*) (int64_t) sd;
 
-    imhttp_req_begin(&imhttp, IMHTTP_GET, "/");
+    imhttp_req_begin(&imhttp, IMHTTP_GET, "/Chunked");
     // printf("Socket: %d\n", sd);
     // * Add some headers to request headers
     {
 	imhttp_req_header(&imhttp, "Host", HOST);
-	imhttp_req_header(&imhttp, "Foo", "Bar");
-	imhttp_req_header(&imhttp, "Hello", "World");
+	// imhttp_req_header(&imhttp, "Hello", "World");
 	imhttp_req_headers_end(&imhttp);
 	imhttp_req_body_chunk(&imhttp, "Hello World\n");
 	imhttp_req_body_chunk(&imhttp, "Test, test, test\n");
@@ -95,16 +97,18 @@ int main() {
 	// * Read headers
 	String_View name, value;
 	while(imhttp_res_next_header(&imhttp, &name, &value)) {
-	    printf("-----------------------------------------\n");	    
-	    printf("Header Name: "SV_Fmt"\n", SV_Arg(name));
-	    printf("Header Value: "SV_Fmt"\n", SV_Arg(value));
+	    // printf("-----------------------------------------\n");	    
+	    // printf("Header Name: "SV_Fmt"\n", SV_Arg(name));
+	    // printf("Header Value: "SV_Fmt"\n", SV_Arg(value));
 	}
-	printf("-----------------------------------------\n");
+	// printf("-----------------------------------------\n");
+
+	printf("Is chunked: %d\n", imhttp.chunked);
 
 	// * Read body chunks
 	String_View chunk;
 	while(imhttp_res_next_body_chunk(&imhttp, &chunk)) {
-	    printf(SV_Fmt, SV_Arg(chunk));
+	    printf(""SV_Fmt"\n", SV_Arg(chunk));
 	}
 
     }

@@ -66,6 +66,26 @@ uint64_t sv_to_u64(String_View sv) {
     return result;
 }
 
+uint64_t sv_hex_to_u64(String_View sv) {
+    uint64_t result = 0;
+    for(size_t i = 0; i < sv.count; ++i) {
+	const char x = sv.data[i];
+	if('0' <= x && x <= '9') {
+	    result = result * 16 + x - '0';
+	}
+	else if('a' <= x && x <= 'z') {
+	    result = result * 16 + x - 'a' + 10; 
+	}
+	else if('A' <= x && x <= 'Z') {
+	    result = result * 16 + x - 'A' + 10; 
+	}
+	else {
+	    return result;
+	}
+    }
+    return result;
+}
+
 bool sv_starts_with(String_View sv, String_View prefix) {
     if(sv.count >= prefix.count) {
 	const String_View temp = {

@@ -40,6 +40,8 @@ typedef struct {
     
     int content_length;
     bool chunked;
+    bool chunked_done;
+    size_t chunk_length;
 } ImHTTP;
 
 void imhttp_req_begin(ImHTTP *imhttp, ImHTTP_Method method, const char *resource);
@@ -85,7 +87,7 @@ void imhttp_req_begin(ImHTTP *imhttp, ImHTTP_Method method, const char *resource
     imhttp_write_cstr(imhttp, imhttp_method_as_cstr(method));
     imhttp_write_cstr(imhttp, " ");
     imhttp_write_cstr(imhttp, resource);
-    imhttp_write_cstr(imhttp, " HTTP/1.0\r\n");
+    imhttp_write_cstr(imhttp, " HTTP/1.1\r\n");
 }
 
 // * This function will write some headers to socket in following format
@@ -163,13 +165,16 @@ void imhttp_res_begin(ImHTTP *imhttp) {
     // * Reset the content_length
     imhttp->content_length = -1;
     imhttp->chunked = false;
+    imhttp->chunked_done = false;
+    imhttp->chunk_length = 0;
 }
 
 // * Get the status code from response
 uint64_t imhttp_res_status_code(ImHTTP *imhttp) {
     imhttp_top_rollin_buffer(imhttp);
     String_View rollin = imhttp_rollin_buffer_as_sv(imhttp);
-
+    // SV_PRINT(rollin);
+    
     String_View status_line = sv_chop_by_delim(&rollin, '\n');
     // SV_PRINT(status_line);    
     assert(
@@ -232,6 +237,56 @@ bool imhttp_res_next_header(ImHTTP *imhttp, String_View *name, String_View *valu
 }
 
 bool imhttp_res_next_body_chunk(ImHTTP *imhttp, String_View *chunk) {
+    // * Handle chunked encoding type
+    if(imhttp->chunked) {
+
+	if(imhttp->chunked_done) {
+	    return false;
+	}
+
+	// * top the rollin buffer
+	imhttp_top_rollin_buffer(imhttp);
+	
+	if(imhttp->chunk_length == 0) {
+	    // * Get the length of the chunk
+	    String_View rollin = imhttp_rollin_buffer_as_sv(imhttp);
+	    String_View chunk_length_sv = sv_chop_by_delim(&rollin, '\n');
+	    // SV_PRINT(chunk_length_sv);
+	    assert(	    
+	    sv_ends_with(chunk_length_sv, cstr_to_sv("\r")) &&	    
+	    "The rolling buffer is so small that it could not fit the whole status line."	    
+	    "Or maybe the header line was not fully read after the imhttp_top_rollin_buffer()"	    
+	    "above");	 
+	    
+	    imhttp->chunk_length = sv_hex_to_u64(chunk_length_sv);
+	    printf("Chunk Length: %zu \n", imhttp->chunk_length);
+	    imhttp_shift_rollin_buffer(imhttp, rollin.data);
+	}
+
+	if(imhttp->chunk_length == 0) {
+	    imhttp->chunked_done = true;
+	    return false;
+	}
+
+	{
+	    size_t n = imhttp->chunk_length;
+	    // printf("imhttp->rollin_buffer_size: %zu\n", imhttp->rollin_buffer_size);
+	    if(n > imhttp->rollin_buffer_size) {
+		n = imhttp->rollin_buffer_size;
+	    }
+	    
+	    String_View data = imhttp_shift_rollin_buffer(imhttp, imhttp->rollin_buffer + n);
+	    // printf("imhttp->rollin_buffer_size: %zu\n", imhttp->rollin_buffer_size);
+	    
+	    imhttp->chunk_length -= n;
+	    if(chunk) {
+		*chunk = data;
+	    }
+	}
+
+	return true;
+	// * Get a bit of the body of the chunk
+    }
 
     // * TODO: ImHTTP can't handle the responses that do not set Content-Length    
     // printf("Content Length: %d\n", imhttp->content_length);

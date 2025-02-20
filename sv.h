@@ -21,6 +21,7 @@ void sv_trim_right(String_View *sv);
 void sv_trim(String_View *sv);
 int sv_eq(String_View a, String_View b);
 uint64_t sv_to_u64(String_View a);
+uint64_t sv_hex_to_u64(String_View sv);
 
 bool sv_starts_with(String_View sv, String_View suffix);
 bool sv_ends_with(String_View sv, String_View suffix);
